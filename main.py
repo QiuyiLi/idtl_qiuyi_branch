@@ -17,6 +17,10 @@ def build_tree_recurse(gene_tree, path):
     _id = '_' + path.split('_')[-1] if len(path_splited) > 1 else ''
     parent_name_splited = gene_tree.name.split('_')
     _parent_id = '_' + parent_name_splited[-1] if len(parent_name_splited) > 1 else ''
+    for i in range(len(parent_name_splited)):
+        if ('l' in parent_name_splited[i] and len(parent_name_splited[i])==2):
+            _parent_id = '_' + parent_name_splited[i-1] if i > 1 else ''
+            break
 
     if (_id):
         subtree_path = os.path.join(path, 'gene_tree.txt')
@@ -38,6 +42,24 @@ def build_tree_recurse(gene_tree, path):
         for node in gene_tree.traverse():
             if node.name == (node_name + _parent_id):
                 child = node
+                break
+            elif (node.name):
+                if '_dl' in node.name:
+                    if node.name.split('_dl')[0] == (node_name + _parent_id):
+                        child = node
+                        break
+                elif '_tl' in node.name:
+                    if node.name.split('_tl')[0] == (node_name + _parent_id):
+                        child = node
+                        break
+                elif '_il' in node.name:
+                    if node.name.split('_il')[0] == (node_name + _parent_id):
+                        child = node
+                        break
+                elif '_sl' in node.name:
+                    if node.name.split('_sl')[0] == (node_name + _parent_id):
+                        child = node
+                        break
         parent = child.parent
         new_dt_node.name = node_name + event_name + _id
         new_dt_node.length = child.length - distance
@@ -62,7 +84,6 @@ def build_tree_recurse(gene_tree, path):
             files_end_with_digit.append(f)
     files = files_end_with_digit
     files = sorted(files,key = lambda x:int(x.split('_')[-1]))
-    print(files)
     for f in files:
         file_path = os.path.join(path, f)
         if os.path.isdir(file_path):
@@ -113,15 +134,51 @@ def build_tree_recurse(gene_tree, path):
 
             new_l_node = skbio.TreeNode()
             child = None
+            print('start')
             for node in current_tree.traverse():
                 if (node.name):
+                    print('n=', node.name)
                     splited = node.name.split('_')
                 if (_id == ''):
                     if (splited[0] == node_l_name):
                         child = node
+                        break
                 else:
+                    if node.name == (node_l_name + _id):
+                        child = node
+                        break
+                    elif (splited[0] == node_l_name and ('_' + splited[-1]) == _id):
+                        child = node
+                        break
+                    elif '_dl' in node.name:
+                        if node.name.split('_dl')[0] == (node_l_name + _id):
+                            child = node
+                            break
+                        else:
+                            splited = node.name.split('_dl')[0].split('_')
+                    elif '_tl' in node.name:
+                        if node.name.split('_tl')[0] == (node_l_name + _id):
+                            child = node
+                            break
+                        else:
+                            splited = node.name.split('_tl')[0].split('_')
+                    elif '_il' in node.name:
+                        if node.name.split('_il')[0] == (node_l_name + _id):
+                            child = node
+                            break
+                        else:
+                            splited = node.name.split('_il')[0].split('_')
+                    elif '_sl' in node.name:
+                        if node.name.split('_sl')[0] == (node_l_name + _id):
+                            child = node
+                            break
+                        else:
+                            splited = node.name.split('_sl')[0].split('_')
                     if (splited[0] == node_l_name and ('_' + splited[-1]) == _id):
                         child = node
+                        break
+            print(node_l_name + _id)
+            print('end')
             parent = child.parent
             if '_s_' in parent.name:
                 new_l_node.name = node_l_name + '_l' + '_id' + _id 
@@ -173,7 +230,8 @@ def cut_tree(final_tree, loss_nodes):
     final.prune()
     return final
 
-def main(options):
+def main(input, coalescentArgs, duplicationArgs, transferArgs, lossArgs,
+             hemiplasy, recombination):
     shutil.rmtree('./output')
     os.mkdir('./output')
     # os.mkdir('./output/newick_gene_subtrees')
@@ -190,13 +248,14 @@ def main(options):
     # Debug.summary(header='Events:\n') 
     # Debug.summary(header='type\tspecies_node\tclade_set\n')   
 
-    qstree = SpeciesTree(newick_path='data/tree_sample.txt')    # read newick species tree
+    qstree = SpeciesTree(newick_path=input) 
+    # qstree = SpeciesTree(newick_path='data/tree_sample2.txt')    # read newick species tree
     Debug.save_tree_nodes(nodes=qstree.nodes, path='output/species_nodes_table.txt')
 
     SpeciesTree.global_species_tree = qstree
     # I want fake id
     SpeciesTree.global_species_tree.post_order_fake_id()
-    SpeciesTree.lambda_coal = np.random.gamma(shape=3, scale=0.1, size=len(qstree.leaves))
+    SpeciesTree.lambda_coal = np.random.gamma(shape=coalescentArgs['shape'], scale=coalescentArgs['scale'], size=len(qstree.leaves))
 
     Debug.log(header='\nspecies_tree ascii_art:\n',
                          bodies=[qstree.skbio_tree.ascii_art()])
@@ -214,12 +273,23 @@ def main(options):
     
 
     qgtree = GeneTree(time_sequences=time_sequences, species_tree=qstree, coalescent_process=coalescent_process)        # construct newick coalescent tree
+    if ('const' not in duplicationArgs):
+        GeneTree.lambda_dup = np.random.gamma(shape=duplicationArgs['shape'], scale=duplicationArgs['scale'], size=len(qgtree.leaves))
+    else:
+        GeneTree.lambda_dup = np.repeat(duplicationArgs['const'], len(qgtree.leaves))
 
-    GeneTree.lambda_dup = np.random.gamma(shape=0.5, scale=0.1, size=len(qgtree.leaves))
-    GeneTree.lambda_loss = np.random.gamma(shape=0.5, scale=0.1, size=len(qgtree.leaves))
-    GeneTree.lambda_trans = np.random.gamma(shape=0.3, scale=0.1, size=len(qgtree.leaves))
-    GeneTree.recombination = options['recombination']
-    GeneTree.hemiplasy = options['hemiplasy']
+    if ('const' not in lossArgs):
+        GeneTree.lambda_loss = np.random.gamma(shape=lossArgs['shape'], scale=lossArgs['scale'], size=len(qgtree.leaves))
+    else:
+        GeneTree.lambda_loss = np.repeat(lossArgs['const'], len(qgtree.leaves))
+
+    if ('const' not in transferArgs):
+        GeneTree.lambda_trans = np.random.gamma(shape=transferArgs['shape'], scale=transferArgs['scale'], size=len(qgtree.leaves))
+    else:
+        GeneTree.lambda_trans = np.repeat(transferArgs['const'], len(qgtree.leaves))
+
+    GeneTree.recombination = recombination
+    GeneTree.hemiplasy = hemiplasy
 
     Debug.save_tree_nodes(nodes=qgtree.nodes, path='output/gene_nodes_table.txt')
     # Debug.save_output(contents=[qgtree.skbio_tree],
@@ -248,7 +318,17 @@ def main(options):
     final_result_cut = cut_tree(final_result, loss_nodes)
     Debug.save_output(contents=[final_result_cut,final_result_cut.ascii_art()],
                                  path='./output/final_result_cut.txt')
-    Debug.save_output(contents=[final_result_cut],path='./output/final_result_cut_newick.txt')
+    final_result_cut_copy = final_result_cut.deepcopy()
+    for node in final_result_cut_copy.traverse():
+        if node.is_tip():
+            name = node.name
+            name = name.split('*')[0]
+            name = int(name)
+            name = chr(65 + name)
+            node.name = name + '_' + node.name
+    final_result_cut_copy_output = str(final_result_cut_copy).replace("'", '')
+
+    Debug.save_output(contents=[final_result_cut_copy_output],path='./output/final_result_cut_newick.txt')
 
     if (not final_result_cut):
         print("EXCEPTION: ALL LOST")
@@ -333,8 +413,8 @@ def main(options):
                                 find_it_2 = True
                             find_it = find_it_1 * find_it_2
                             if (find_it):
-                                if (species_fake_id_1 != species_fake_id_2):
-                                    print('id1=', species_fake_id_1, 'id2=', species_fake_id_2)
+                                # if (species_fake_id_1 != species_fake_id_2):
+                                #     print('id1=', species_fake_id_1, 'id2=', species_fake_id_2)
                                 break     
 
             if (find_it == False):
@@ -382,34 +462,121 @@ def main(options):
     Debug.summary_file.close()
     return
 
+def default(str):
+    return str + ' [Default: %default]'
 
-def parse_arg(argv):
-    try: 
-        opts, args = getopt.getopt(argv,'r:h:',
-        ['recombination=','hemiplasy=','help'])
-    except getopt.GetoptError:
-        print('Usage: {} -r <recombination> -h <hemiplasy>'.format(sys.argv[0]))
+def parseDistributionArgs(str):
+    if str == None: return {}
+    pieces = str.split(',')
+    opts = {}
+    for p in pieces:
+        if '=' in p:
+            key, val = p.split('=')
+        opts[key] = float(val)
+    return opts
+
+def readCommand(argv):
+    """
+    Processes the command used to run HIDTLModel from the command line.
+    """
+    from optparse import OptionParser
+    usageStr = """
+    USAGE:      python main.py <options>
+    EXAMPLES:   (1) python main.py
+                    - runs a model
+                (2) python main.py --input species_tree.txt
+                OR  python main.py -i species_tree.txt
+    """
+    parser = OptionParser(usageStr, add_help_option=False)
+
+    parser.add_option('--help', action='store_true', help='show this help message')   
+
+    parser.add_option('-i', '--input', dest='input',
+                      help='the path to an input file of a species tree', metavar='INPUT_FILE')
+    parser.add_option('-c', '--coalescentArgs', dest='coalescentArgs',
+                      help=default('the parameters of the gamma distribution for coalescent, e.g., "shape=val1,scale=val2"'),
+                      default='shape=3,scale=0.1')
+    parser.add_option('-d', '--duplicationArgs', dest='duplicationArgs',
+                      help=default('the parameters of the gamma distribution for duplication event, e.g., "shape=val1,scale=val2"'),
+                      default='shape=0.5,scale=0.1')
+    parser.add_option('-t', '--transferArgs', dest='transferArgs',
+                      help=default('the parameters of the gamma distribution for transfer event, e.g., "shape=val1,scale=val2"'),
+                      default='shape=0.3,scale=0.1')
+    parser.add_option('-l', '--lossArgs', dest='lossArgs',
+                      help=default('the parameters of the gamma distribution for loss event, e.g., "shape=val1,scale=val2"'),
+                      default='shape=0.5,scale=0.1') 
+    parser.add_option('-h', '--hemiplasy', type='int', dest='hemiplasy',
+                      help=default('hemiplasy option, 0 or 1'), metavar='HEMIPLASY',
+                      default=1)      
+    parser.add_option('-r', '--recombination', type='int', dest='recombination',
+                      help=default('recombination option, 0 or 1'), metavar='RECOMBINATION',
+                      default=1)   
+    
+
+    options, otherjunk = parser.parse_args(argv)
+    if len(otherjunk) != 0:
+        raise Exception('Command line input not understood: ' + str(otherjunk))
+    args = dict()
+
+    if options.help:
+        parser.print_help()
         sys.exit()
-    if(opts):
-        for opt, arg in opts:
-            if opt in ('-r', '--recombination'):
-                recombination = arg
-            elif opt in ('-h', '--hemiplasy'):
-                hemiplasy = arg
-            elif opt in ('--help'):
-                print('Usage: {} -r <recombination> -h <hemiplasy>'.format(sys.argv[0]))
-                sys.exit()
-    else:
-        recombination = 1
-        hemiplasy = 1
 
-    return recombination, hemiplasy
+    # input file (a species tree in newick format)
+    if not options.input:
+        parser.error('The input filename not given')
+    args['input'] = options.input
+
+    # distribution arguments
+    args['coalescentArgs'] = parseDistributionArgs(options.coalescentArgs)
+    args['duplicationArgs'] = parseDistributionArgs(options.duplicationArgs)
+    args['transferArgs'] = parseDistributionArgs(options.transferArgs)
+    args['lossArgs'] = parseDistributionArgs(options.lossArgs)
+
+    # hemiplasy option
+    if options.hemiplasy != 0 and options.hemiplasy != 1:
+        parser.error('Invalid hemiplasy option: ' + str(options.hemiplasy))
+    args['hemiplasy'] = True if options.hemiplasy == 1 else False
+
+    # recombination option
+    if options.recombination != 0 and options.recombination != 1:
+        parser.error('Invalid recombination option: ' + str(options.recombination))
+    args['recombination'] = True if options.recombination == 1 else False
+
+    return args
+
+
+
+
+# def parse_arg(argv):
+#     try: 
+#         opts, args = getopt.getopt(argv,'r:h:',
+#         ['recombination=','hemiplasy=','help'])
+#     except getopt.GetoptError:
+#         print('Usage: {} -r <recombination> -h <hemiplasy>'.format(sys.argv[0]))
+#         sys.exit()
+#     if(opts):
+#         for opt, arg in opts:
+#             if opt in ('-r', '--recombination'):
+#                 recombination = arg
+#             elif opt in ('-h', '--hemiplasy'):
+#                 hemiplasy = arg
+#             elif opt in ('--help'):
+#                 print('Usage: {} -r <recombination> -h <hemiplasy>'.format(sys.argv[0]))
+#                 sys.exit()
+#     else:
+#         recombination = 1
+#         hemiplasy = 1
+
+#     return recombination, hemiplasy
 
 
 if __name__ == '__main__':
-    recombination, hemiplasy = parse_arg(sys.argv[1:])
-    options = {
-        'recombination': int(recombination),
-        'hemiplasy': int(hemiplasy)
-    }
-    main(options)
+    # recombination, hemiplasy = parse_arg(sys.argv[1:])
+    # options = {
+    #     'recombination': int(recombination),
+    #     'hemiplasy': int(hemiplasy)
+    # }
+
+    args = readCommand(sys.argv[1:])
+    main(**args)

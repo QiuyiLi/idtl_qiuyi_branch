@@ -1,0 +1,14 @@
+#!/bin/bash
+
+echo Hello, World!
+
+for value in {1..5}
+do
+    python3 './main.py'
+
+    python3 '/Users/qiuyi_li/Desktop/HIDTL/utility/newick_pipeline.py'
+
+    '/Users/qiuyi_li/Desktop/HIDTL/ecceTREA_qiuyi/bin/ecceTERA' species.file='/Users/qiuyi_li/Desktop/HIDTL/ecceTREA_qiuyi/tests/AStree.tree' gene.file='/Users/qiuyi_li/Desktop/HIDTL/ecceTREA_qiuyi/tests/AGtree.gtree' print.reconciliations=2 dupli.cost=2 loss.cost=1 ils.cost=4 ils.cutoff=5 HGT.cost=3 compute.T=1 compute.TD=0 gene.origination.species.root=1
+    
+    python3 '/Users/qiuyi_li/Desktop/HIDTL/utility/event_compare.py'
+done

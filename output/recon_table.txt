@@ -1,4 +1,11 @@
 gene_id	species_id	event_name
-3	5	D
-4	6	D
-4	6	SL
+10	3	D
+2	2	S
+4	2	D
+11	3	D
+12	5	D
+13	5	T
+19	7	D
+14	6	S
+16	8	I
+20	8	S
